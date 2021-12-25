@@ -4,14 +4,11 @@ import JSONWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import CSSWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import HTMLWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import TSWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-import prettier from 'prettier/standalone';
-import parserBabel from 'prettier/parser-babel';
-import parserHtml from 'prettier/parser-html';
-import parserPostcss from 'prettier/parser-postcss';
-import type { CursorOptions, CursorResult, Options } from 'prettier';
 import GitHubTheme from 'monaco-themes/themes/GitHub.json';
 import { getMany, setMany, set } from 'idb-keyval';
 import './style.css';
+import { format } from './prettier';
+import DiffNavigator from './DiffNavigator';
 
 // @ts-ignore
 self.MonacoEnvironment = {
@@ -32,26 +29,9 @@ self.MonacoEnvironment = {
   },
 };
 
-const diffEditor = monaco.editor.createDiffEditor(
-  document.getElementById('editor')!,
-  {
-    originalEditable: true,
-    renderWhitespace: 'boundary',
-    renderSideBySide: true,
-    ignoreTrimWhitespace: false,
-    renderOverviewRuler: false,
-    formatOnPaste: true,
-    formatOnType: true,
-    fontSize: 15,
-    inlayHints: { enabled: false },
-    inlineSuggest: { enabled: false },
-    lightbulb: { enabled: false },
-    minimap: { enabled: false },
-    quickSuggestions: false,
-    snippetSuggestions: 'none',
-  }
-);
-
+/**
+ * Disable some language diagnostics
+ */
 monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
   noSuggestionDiagnostics: true,
@@ -63,49 +43,14 @@ monaco.languages.css.cssDefaults.setOptions({
   validate: false,
 });
 
-const PRETTIER_OPTIONS = {
-  endOfLine: 'auto' as 'auto',
-};
-
-function format(
-  model: monaco.editor.ITextModel,
-  options: CursorOptions | Options = {}
-) {
-  function isCursorOptions(
-    options: CursorOptions | Options
-  ): options is CursorOptions {
-    return typeof (options as CursorOptions).cursorOffset !== 'undefined';
-  }
-
-  const value = model.getValue();
-  const languageId = model.getLanguageId();
-
-  let parser = 'babel-ts';
-  if (languageId === 'json') {
-    parser = 'json';
-  } else if (languageId === 'html') {
-    parser = 'html';
-  } else if (languageId === 'css') {
-    parser = 'css';
-  }
-
-  const prettierOptions = {
-    parser,
-    plugins: [parserBabel, parserHtml, parserPostcss],
-    ...PRETTIER_OPTIONS,
-    ...options,
-  };
-
-  return isCursorOptions(options)
-    ? prettier.formatWithCursor(value, prettierOptions as CursorOptions)
-    : prettier.format(value, prettierOptions);
-}
-
+/**
+ * Set up prettier formatting provider
+ */
 const prettierFormattingEditProvider: monaco.languages.DocumentFormattingEditProvider =
   {
     displayName: 'prettier',
     provideDocumentFormattingEdits(model) {
-      const formatted = format(model) as string;
+      const formatted = format(model);
       return [{ range: model.getFullModelRange(), text: formatted }];
     },
   };
@@ -131,9 +76,34 @@ monaco.languages.registerDocumentFormattingEditProvider(
   prettierFormattingEditProvider
 );
 
+/**
+ * Register and configure default theme
+ */
 // @ts-ignore
 monaco.editor.defineTheme('github', GitHubTheme);
 monaco.editor.setTheme('github');
+
+const diffEditor = monaco.editor.createDiffEditor(
+  document.getElementById('editor')!,
+  {
+    originalEditable: true,
+    renderWhitespace: 'boundary',
+    renderSideBySide: true,
+    ignoreTrimWhitespace: false,
+    renderOverviewRuler: false,
+    formatOnPaste: true,
+    formatOnType: true,
+    fontSize: 15,
+    inlayHints: { enabled: false },
+    inlineSuggest: { enabled: false },
+    lightbulb: { enabled: false },
+    minimap: { enabled: false },
+    quickSuggestions: false,
+    snippetSuggestions: 'none',
+  }
+);
+
+const diffNavigator = new DiffNavigator(diffEditor);
 
 diffEditor.onDidUpdateDiff(function updateLineChanges() {
   const lineChanges = diffEditor.getLineChanges()!;
@@ -185,22 +155,13 @@ function setupEditor(
     hasFocus = false;
   });
 
-  editor.onDidBlurEditorWidget(() => {
-    const position = editor.getPosition()!;
-    const model = editor.getModel()!;
-    const cursorOffset = model.getOffsetAt(position);
-
-    const { formatted, cursorOffset: formattedCursorOffset } = format(model, {
-      cursorOffset,
-    }) as CursorResult;
-    editor.setValue(formatted);
-    const formattedPosition = model.getPositionAt(formattedCursorOffset);
-    editor.setPosition(formattedPosition);
+  editor.onDidBlurEditorWidget(function formatOnBlur() {
+    editor.getAction('editor.action.formatDocument').run();
   });
 }
 
-const placeholderOriginalCode = `// Paste your original code here`;
-const placeholderModifiedCode = `// Paste your modified code here`;
+const placeholderOriginalCode = `// Paste your original code here\n`;
+const placeholderModifiedCode = `// Paste your modified code here\n`;
 
 const originalEditor = diffEditor.getOriginalEditor();
 const modifiedEditor = diffEditor.getModifiedEditor();
@@ -247,8 +208,8 @@ selectLanguageElement.addEventListener('change', (event) => {
   monaco.editor.setModelLanguage(originalModel, languageId);
   monaco.editor.setModelLanguage(modifiedModel, languageId);
 
-  originalModel.setValue(format(originalModel) as string);
-  modifiedModel.setValue(format(modifiedModel) as string);
+  originalEditor.getAction('editor.action.formatDocument').run();
+  modifiedEditor.getAction('editor.action.formatDocument').run();
 
   set('language', languageId);
 });
@@ -265,26 +226,12 @@ for (const radio of Array.from(
   });
 }
 
-const diffNavigator = monaco.editor.createDiffNavigator(diffEditor, {
-  followsCaret: true,
-  ignoreCharChanges: false,
-});
-
-function nextDiff() {
-  modifiedEditor.focus();
-  if (diffNavigator.canNavigate()) {
-    diffNavigator.next();
-  }
-}
-function prevDiff() {
-  modifiedEditor.focus();
-  if (diffNavigator.canNavigate()) {
-    diffNavigator.next();
-  }
-}
-
-document.getElementById('next-diff')!.addEventListener('click', nextDiff);
-document.getElementById('prev-diff')!.addEventListener('click', prevDiff);
+document
+  .getElementById('next-diff')!
+  .addEventListener('click', () => diffNavigator.next());
+document
+  .getElementById('prev-diff')!
+  .addEventListener('click', () => diffNavigator.previous());
 
 document
   .getElementById('switch-original-with-modified')!
@@ -297,6 +244,15 @@ document
       modified: originalModel,
     });
   });
+
+document.getElementById('reset-editor')!.addEventListener('click', () => {
+  diffEditor.setModel({
+    original: monaco.editor.createModel(placeholderOriginalCode, 'typescript'),
+    modified: monaco.editor.createModel(placeholderModifiedCode, 'typescript'),
+  });
+
+  selectLanguageElement.value = 'typescript';
+});
 
 /**
  * Debugging purpose
