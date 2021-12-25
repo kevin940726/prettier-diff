@@ -86,6 +86,7 @@ monaco.editor.setTheme('github');
 const diffEditor = monaco.editor.createDiffEditor(
   document.getElementById('editor')!,
   {
+    ariaLabel: 'Prettier diff editor',
     originalEditable: true,
     renderWhitespace: 'boundary',
     renderSideBySide: true,
