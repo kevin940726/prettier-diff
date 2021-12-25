@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --delete-lines-color: rgb(207, 34, 46);
+  --insert-lines-color: rgb(26, 127, 55);
+}

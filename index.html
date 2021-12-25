@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Prettier Diff</title>
+    <meta name="description" content="👀  View prettified diff online" />
+  </head>
+  <body class="flex flex-col items-stretch m-0 h-full">
+    <header class="prose flex flex-col items-stretch max-w-full mx-4 mt-5 mb-2">
+      <h1 class="font-normal">Prettier Diff</h1>
+
+      <div class="relative flex justify-between items-end">
+        <div>
+          <label class="block">
+            Language:
+            <select id="select-language" value="typescript">
+              <option value="typescript">JavaScript / TypeScript</option>
+              <option value="json">JSON</option>
+              <option value="css">CSS</option>
+              <option value="html">HTML</option>
+            </select>
+          </label>
+          <div>
+            Diff view:
+            <label>
+              <input type="radio" name="diff-view" value="split" checked>
+              Split
+            </label>
+            <label>
+              <input type="radio" name="diff-view" value="unified">
+              Unified
+            </label>
+          </div>
+        </div>
+
+        <div class="absolute left-2/4 -translate-x-2/4">
+          <button type="button" id="prev-diff" class="p-1 rounded-md border border-current" title="Jump to previous diff">
+            <span class="sr-only">Jump to previous diff</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button type="button" id="switch-original-with-modified" class="p-1 rounded-md border border-current" title="Switch original with modified">
+            <span class="sr-only">Switch original with modified</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </button>
+          <button type="button" id="next-diff" class="p-1 rounded-md border border-current" title="Jump to next diff">
+            <span class="sr-only">Jump to next diff</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        <div>
+          <div id="line-changes" class="text-right">
+            <span class="text-insert">+0</span>
+            <span class="text-delete">-0</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="editor" class="grow w-full border-t border-t-slate-200"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
